@@ -44,13 +44,13 @@ module.exports = function (app, pool, bcrypt, jwt) {
     })
 
     //Register
-    app.post("/regestier", async (req, res) => {
-        const {nom, adresse, cp, ville, telephone, motdepasse, email} = req.body;
+    app.post("/register", async (req, res) => {
+        const {nom, adresse, cp, ville, telephone, motdepasse, mail} = req.body;
         const hashedPassword = await bcrypt.hash(motdepasse, 10);
-        const values = [mon, adresse, cp, ville, telephone, hashedPassword, email];
+        const values = [nom, adresse, cp, ville, telephone, hashedPassword, mail];
         try {
             await pool.execute(
-                "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, email) VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail) VALUES (?,?,?,?,?,?,?)",
                  values
                  );
                 res.sendStatus(201);
