@@ -6,7 +6,7 @@ const options = {
     info: {
       title: "Votre API",
       version: "1.0.0",
-      description: "Description de votre API",
+      description: "Routes de l'api-Gourmandise",
     },
   },
   apis: ["./endpoints.js"], // Chemin vers vos fichiers contenant des commentaires JSDoc
