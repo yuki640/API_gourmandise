@@ -31,12 +31,30 @@ module.exports = function (app, pool, bcrypt, jwt) {
 
   // Register
   app.post("/register", async (req, res) => {
-    const { nom, adresse, cp, ville, telephone, motdepasse, mail } = req.body;
+    const {
+      nom,
+      adresse,
+      cp,
+      ville,
+      telephone,
+      motdepasse,
+      mail,
+      adrLivraison,
+    } = req.body;
     const hashedPassword = await bcrypt.hash(motdepasse, 10);
-    const values = [nom, adresse, cp, ville, telephone, hashedPassword, mail];
+    const values = [
+      nom,
+      adresse,
+      cp,
+      ville,
+      telephone,
+      hashedPassword,
+      mail,
+      adrLivraison,
+    ];
     try {
       await pool.execute(
-        "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail, adrLivraison) VALUES (?,?,?,?,?,?,?)",
         values
       );
       res.status(201).send(); // Utilisez res.status(201).send() pour une réponse vide avec un code 201.
@@ -49,15 +67,32 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  // aller chercher toutes les commandes d'un client
-  app.get("/allorderClient", async (req, res) => {
+  // aller chercher toutes les commandes en cours d'un client
+  app.get("/allorderClientEC", async (req, res) => {
     // Assurez-vous de récupérer correctement les données de la requête.
     const codec = req.query.codec; // Si vous voulez récupérer le codec depuis la requête GET, utilisez req.query.codec
 
     try {
       // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE codec = ?",
+        "SELECT * FROM commande WHERE codec = ? and etat = 1",
+        [codec] // Utilisez un tableau pour passer les valeurs des paramètres.
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Aller chercher toutes les commandes cloturée d'un client
+  app.get("/allorderClientCL", async (req, res) => {
+    // Assurez-vous de récupérer correctement les données de la requête.
+    const codec = req.query.codec; // Si vous voulez récupérer le codec depuis la requête GET, utilisez req.query.codec
+
+    try {
+      // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE codec = ? and etat = 2",
         [codec] // Utilisez un tableau pour passer les valeurs des paramètres.
       );
       res.status(200).json(rows);
@@ -120,13 +155,13 @@ module.exports = function (app, pool, bcrypt, jwt) {
   // mettre a jour le profil client
   app.post("/updateprofil", async (req, res) => {
     // Assurez-vous de récupérer correctement les données de la requête.
-    const { nom, adresse, cp, ville, telephone, mail } = req.body;
+    const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
 
     try {
       // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
-        "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ? WHERE mail = ?",
-        [nom, adresse, cp, ville, telephone, mail] // Utilisez un tableau pour passer les valeurs des paramètres.
+        "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ? WHERE mail = ?",
+        [nom, adresse, cp, ville, telephone, adrLivraison, mail] // Utilisez un tableau pour passer les valeurs des paramètres.
       );
       res.status(200).json(rows);
     } catch (err) {

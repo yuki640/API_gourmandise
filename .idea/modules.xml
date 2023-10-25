@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/api-gourmandise.iml" filepath="$PROJECT_DIR$/.idea/api-gourmandise.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/API_gourmandise.iml" filepath="$PROJECT_DIR$/.idea/API_gourmandise.iml" />
     </modules>
   </component>
 </project>
