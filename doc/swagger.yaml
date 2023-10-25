@@ -1,0 +1,77 @@
+openapi: 3.0.0
+info:
+  title: Votre API
+  description: Description de votre API
+  version: 1.0.0
+servers:
+  - url: http://localhost:3001
+paths:
+  /api/products:
+    get:
+      summary: Récupérer tous les produits
+      responses:
+        '200':
+          description: Réussite
+          content:
+            application/json:
+              example:
+                - Vos exemples de produits
+  /api/order:
+    get:
+      summary: Récupérer toutes les commandes
+      responses:
+        '200':
+          description: Réussite
+          content:
+            application/json:
+              example:
+                - Vos exemples de commandes
+  /api/order_ligne:
+    get:
+      summary: Récupérer toutes les lignes de commande
+      responses:
+        '200':
+          description: Réussite
+          content:
+            application/json:
+              example:
+                - Vos exemples de lignes de commande
+  /api/clients:
+    get:
+      summary: Récupérer tous les clients
+      responses:
+        '200':
+          description: Réussite
+          content:
+            application/json:
+              example:
+                - Vos exemples de clients
+  /api/register:
+    post:
+      summary: Inscription d'un client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                adresse:
+                  type: string
+                cp:
+                  type: string
+                ville:
+                  type: string
+                telephone:
+                  type: string
+                motdepasse:
+                  type: string
+                mail:
+                  type: string
+      responses:
+        '201':
+          description: Créé
+        '500':
+          description: Erreur interne du serveur
