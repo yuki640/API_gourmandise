@@ -4,8 +4,7 @@ const http = require("http");
 const jwt = require("jsonwebtoken");
 const mysql = require("mysql2/promise");
 const swaggerUi = require("swagger-ui-express");
-const swaggerDocument = require("./doc/swagger.yaml"); // Le chemin de votre fichier YAML
-
+const swaggerDocument = require("./doc/swaggerOption"); // Importez le fichier de configuration Swagger
 const app = express();
 
 // variable d'environnement
@@ -16,17 +15,17 @@ const PORT = process.env.PORT;
 const hostname = "localhost";
 const monRouteur = express.Router();
 
-//Pour utiliser bodyparser
+// Pour utiliser bodyparser
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-//permet de parser les requêtes
+// Permet de parser les requêtes
 app.use(express.json());
 
 // bcrypt
 const bcrypt = require("bcrypt");
 
-// Connexion a la base de donnée
+// Connexion à la base de données
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -53,7 +52,7 @@ app.use(function (req, res, next) {
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Vos endpoints
-require("./endpoints")(monRouteur, pool, bcrypt, jwt);
+require("./endpoints")(app, monRouteur, pool, bcrypt, jwt);
 
 // Condition pour basculer entre le routeur et la documentation Swagger
 app.use("/api", (req, res, next) => {

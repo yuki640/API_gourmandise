@@ -1,5 +1,16 @@
-module.exports = function (app, pool, bcrypt, jwt) {
-  // GET all products
+module.exports = function (app, monRouteur, pool, bcrypt) {
+  /**
+   * @swagger
+   * /products:
+   *   get:
+   *     summary: Récupérer la liste de tous les produits
+   *     description: Récupère la liste de tous les produits.
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/products", async (req, res) => {
     try {
       const [rows] = await pool.execute("SELECT * FROM produit");
@@ -9,7 +20,18 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  //GET all order
+  /**
+   * @swagger
+   * /order:
+   *   get:
+   *     summary: Récupérer la liste de toutes les commandes
+   *     description: Récupère la liste de toutes les commandes.
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/order", async (req, res) => {
     try {
       const [rows] = await pool.execute("SELECT * FROM commande");
@@ -19,7 +41,18 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  //GET all order_ligne
+  /**
+   * @swagger
+   * /order_ligne:
+   *   get:
+   *     summary: Récupérer la liste de toutes les lignes de commande
+   *     description: Récupère la liste de toutes les lignes de commande.
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/order_ligne", async (req, res) => {
     try {
       const [rows] = await pool.execute("SELECT * FROM ligne_commande");
@@ -29,7 +62,40 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  // Register
+  /**
+   * @swagger
+   * /register:
+   *   post:
+   *     summary: Inscription d'un utilisateur
+   *     description: Permet à un utilisateur de s'inscrire.
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               nom:
+   *                 type: string
+   *               adresse:
+   *                 type: string
+   *               cp:
+   *                 type: string
+   *               ville:
+   *                 type: string
+   *               telephone:
+   *                 type: string
+   *               motdepasse:
+   *                 type: string
+   *               mail:
+   *                 type: string
+   *               adrLivraison:
+   *                 type: string
+   *     responses:
+   *       201:
+   *         description: Utilisateur enregistré avec succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.post("/register", async (req, res) => {
     const {
       nom,
@@ -54,10 +120,10 @@ module.exports = function (app, pool, bcrypt, jwt) {
     ];
     try {
       await pool.execute(
-        "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail, adrLivraison) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail, adrLivraison) VALUES (?,?,?,?,?,?,?,?)",
         values
       );
-      res.status(201).send(); // Utilisez res.status(201).send() pour une réponse vide avec un code 201.
+      res.status(201).send();
     } catch (err) {
       console.log(err);
       res.status(500).json({
@@ -67,16 +133,31 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  // aller chercher toutes les commandes en cours d'un client
+  /**
+   * @swagger
+   * /allorderClientEC:
+   *   get:
+   *     summary: Récupérer toutes les commandes en cours d'un client
+   *     description: Récupère toutes les commandes en cours d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/allorderClientEC", async (req, res) => {
-    // Assurez-vous de récupérer correctement les données de la requête.
-    const codec = req.query.codec; // Si vous voulez récupérer le codec depuis la requête GET, utilisez req.query.codec
-
+    const codec = req.query.codec;
     try {
-      // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat = 1",
-        [codec] // Utilisez un tableau pour passer les valeurs des paramètres.
+        [codec]
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -84,84 +165,164 @@ module.exports = function (app, pool, bcrypt, jwt) {
     }
   });
 
-  // Aller chercher toutes les commandes cloturée d'un client
+  /**
+   * @swagger
+   * /allorderClientCL:
+   *   get:
+   *     summary: Récupérer toutes les commandes clôturées d'un client
+   *     description: Récupère toutes les commandes clôturées d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/allorderClientCL", async (req, res) => {
-    // Assurez-vous de récupérer correctement les données de la requête.
-    const codec = req.query.codec; // Si vous voulez récupérer le codec depuis la requête GET, utilisez req.query.codec
-
+    const codec = req.query.codec;
     try {
-      // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat = 2",
-        [codec] // Utilisez un tableau pour passer les valeurs des paramètres.
+        [codec]
       );
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
-  // aller chercher une seule commande d'un client
-  app.get("/oneorderclient", async (req, res) => {
-    // Assurez-vous de récupérer correctement les données de la requête.
-    const { numero, codec } = req.query; // Utilisez req.query pour récupérer les paramètres de la requête GET.
 
+  /**
+   * @swagger
+   * /oneorderclient:
+   *   get:
+   *     summary: Récupérer une seule commande d'un client
+   *     description: Récupère une seule commande d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: numero
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Numéro de commande
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/oneorderclient", async (req, res) => {
+    const { numero, codec } = req.query;
     try {
-      // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE numero = ? and codec = ?",
-        [numero, codec] // Utilisez un tableau pour passer les valeurs des paramètres.
+        [numero, codec]
       );
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
-  // aller passer une commande
 
-  //PAS TROUVER COMMENT FAIRE
-
-  // se logger(middleware)
+  /**
+   * @swagger
+   * /login:
+   *   post:
+   *     summary: Authentification d'un utilisateur
+   *     description: Permet à un utilisateur de se connecter.
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               email:
+   *                 type: string
+   *               motdepasse:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Authentification réussie
+   *       401:
+   *         description: Adresse e-mail non enregistrée ou mot de passe incorrect
+   *       500:
+   *         description: Erreur serveur
+   */
   app.post("/login", async (req, res) => {
     const { email, motdepasse } = req.body;
-
     try {
-      // Recherchez l'utilisateur par adresse e-mail dans la base de données.
       const [rows] = await pool.execute("SELECT * FROM client WHERE mail = ?", [
         email,
       ]);
 
       if (rows.length === 0) {
-        // Aucun utilisateur trouvé avec cette adresse e-mail.
         return res
           .status(401)
           .json({ message: "L'adresse e-mail n'est pas enregistrée." });
       }
 
-      // Vérifiez le mot de passe haché.
       const user = rows[0];
       const passwordMatch = await bcrypt.compare(motdepasse, user.motdepasse);
 
       if (passwordMatch) {
-        // Le mot de passe correspond, l'utilisateur est authentifié.
         res.status(200).json({ message: "Authentification réussie" });
       } else {
-        // Le mot de passe ne correspond pas.
         res.status(401).json({ message: "Mot de passe incorrect." });
       }
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
-  // mettre a jour le profil client
-  app.post("/updateprofil", async (req, res) => {
-    // Assurez-vous de récupérer correctement les données de la requête.
-    const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
 
+  /**
+   * @swagger
+   * /updateprofil:
+   *   post:
+   *     summary: Mettre à jour le profil d'un client
+   *     description: Permet à un utilisateur de mettre à jour son profil.
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               nom:
+   *                 type: string
+   *               adresse:
+   *                 type: string
+   *               cp:
+   *                 type: string
+   *               ville:
+   *                 type: string
+   *               telephone:
+   *                 type: string
+   *               mail:
+   *                 type: string
+   *               adrLivraison:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Profil mis à jour avec succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.post("/updateprofil", async (req, res) => {
+    const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
     try {
-      // Utilisez des backticks (`) pour définir la requête SQL si vous utilisez des paramètres.
       const [rows] = await pool.execute(
         "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ? WHERE mail = ?",
-        [nom, adresse, cp, ville, telephone, adrLivraison, mail] // Utilisez un tableau pour passer les valeurs des paramètres.
+        [nom, adresse, cp, ville, telephone, adrLivraison, mail]
       );
       res.status(200).json(rows);
     } catch (err) {
