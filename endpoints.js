@@ -22,48 +22,6 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
-   * /order:
-   *   get:
-   *     summary: Récupérer la liste de toutes les commandes
-   *     description: Récupère la liste de toutes les commandes.
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/order", async (req, res) => {
-    try {
-      const [rows] = await pool.execute("SELECT * FROM commande");
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * @swagger
-   * /order_ligne:
-   *   get:
-   *     summary: Récupérer la liste de toutes les lignes de commande
-   *     description: Récupère la liste de toutes les lignes de commande.
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/order_ligne", async (req, res) => {
-    try {
-      const [rows] = await pool.execute("SELECT * FROM ligne_commande");
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * @swagger
    * /register:
    *   post:
    *     summary: Inscription d'un utilisateur
@@ -234,7 +192,30 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
-
+  /**
+   * @swagger
+   * /order_ligne:
+   *   get:
+   *     summary: Récupérer la liste de toutes les lignes de commande
+   *     description: Récupère la liste de toutes les lignes de commande.
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/order_ligne", async (req, res) => {
+    const { numero } = req.query;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM ligne_commande where numero = ?",
+        [numero]
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   /**
    * @swagger
    * /login:
@@ -280,6 +261,84 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       } else {
         res.status(401).json({ message: "Mot de passe incorrect." });
       }
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * @swagger
+   * /lookprofil:
+   *   post:
+   *     summary: Recherche de profil client par code client
+   *     description: Recherche un profil client en utilisant le code client fourni.
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               codec:
+   *                 type: string
+   *           example:
+   *             codec: "123456"
+   *     responses:
+   *       200:
+   *         description: Succès
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 type: object
+   *                 properties:
+   *                   codec:
+   *                     type: string
+   *                   nom:
+   *                     type: string
+   *                   adresse:
+   *                     type: string
+   *                   cp:
+   *                     type: string
+   *                   ville:
+   *                     type: string
+   *                   telephone:
+   *                     type: string
+   *                   mail:
+   *                     type: string
+   *                   adrLivraison:
+   *                     type: string
+   *             example:
+   *               - codec: 1
+   *                 nomprenom: Doe John
+   *                 adresse: 29ter route du mariland
+   *                 cp: "41575"
+   *                 ville: Mariland
+   *                 telephone: 0756487584
+   *                 mail: thomas.campus.fr
+   *                 adrLivraison: 29ter route du mariland
+   *
+   *       500:
+   *         description: Erreur du serveur
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *             example:
+   *               message: "Une erreur s'est produite lors de la recherche du profil client."
+   */
+
+  app.post("/lookprofil", async (req, res) => {
+    const { codec } = req.body;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * from client WHERE codec = ?",
+        [codec]
+      );
+      res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
