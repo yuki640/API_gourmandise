@@ -20,6 +20,35 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
+  app.get("/fiche_products", async (req, res) => {
+    try {
+      const [rows] = await pool.execute("SELECT * FROM produit WHERE reference");
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+
+  app.get("/new_products", async (req, res) => {
+    try {
+      const [rows] = await pool.execute("SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)");
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+
+  app.get("/liste_promo", async (req, res) => {
+    try {
+      const [rows] = await pool.execute(" SELECT * FROM `produit` WHERE etatPromo >0 AND prixPromo > 0");
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   /**
    * @swagger
    * /register:
@@ -90,6 +119,64 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       });
     }
   });
+
+  app.post("/addPagnier", async (req, res) =>{
+    const {
+      codec,
+      total_prix,
+      numero_ligne,
+      reference,
+      quantite,
+    } = req.body;
+    const values = [
+      codec,
+      total_prix,
+      numero_ligne,
+      reference,
+      quantite,
+    ];
+    try {
+      await pool.execute(
+        "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
+        values
+      );
+      res.status(201).send();
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({
+        success: false,
+        message: "Une erreur est survenue lors de l'enregistrement",
+      });
+    }
+  });
+
+  // app.post("/addCommande", async (req, res) =>{
+  //   const {
+  //     codec,
+  //     total_prix,
+  //     reference,
+  //     quantite,
+  //   } = req.body;
+  //   const values = [
+  //     codec,
+  //     total_prix,
+  //     reference,
+  //     quantite,
+  //   ];
+  //   try {
+  //     await pool.execute(
+  //       "INSERT INTO commande (codev, codec, total_ht, numero_ligne, reference, quantite) VALUES (18,?,?,?,?,?)",
+  //       values
+  //     );
+  //     res.status(201).send();
+  //   } catch (err) {
+  //     console.log(err);
+  //     res.status(500).json({
+  //       success: false,
+  //       message: "Une erreur est survenue lors de l'enregistrement",
+  //     });
+  //   }
+  // });
 
   /**
    * @swagger
