@@ -1,3 +1,6 @@
+const express = require("express");
+const auth = require("./auth"); // Importez le fichier auth.js
+
 module.exports = function (app, monRouteur, pool, bcrypt) {
   /**
    * @swagger
@@ -336,15 +339,16 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
       if (rows.length === 0) {
         return res
-          .status(401)
-          .json({ message: "L'adresse e-mail n'est pas enregistrée." });
+            .status(401)
+            .json({ message: "L'adresse e-mail n'est pas enregistrée." });
       }
 
       const user = rows[0];
       const passwordMatch = await bcrypt.compare(motdepasse, user.motdepasse);
 
       if (passwordMatch) {
-        res.status(200).json({ message: "Authentification réussie" });
+    const token = auth.generateToken(user);
+        res.status(200).json({ message: "Authentification réussie" , token});
       } else {
         res.status(401).json({ message: "Mot de passe incorrect." });
       }
