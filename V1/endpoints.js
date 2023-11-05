@@ -23,35 +23,285 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
+  /**
+   * @swagger
+   * /fiche_products:
+   *   get:
+   *     summary: Récupérer la fiche d'un produit par référence
+   *     description: Récupère la fiche d'un produit en utilisant sa référence.
+   *     parameters:
+   *       - in: query
+   *         name: reference
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Référence du produit
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
   app.get("/fiche_products", async (req, res) => {
+    const { reference } = req.body;
+    const values = [reference];
     try {
-      const [rows] = await pool.execute("SELECT * FROM produit WHERE reference");
+      const [rows] = await pool.execute(
+        "SELECT * FROM produit WHERE reference = ?",
+        values,
+      );
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-
+  /**
+   * @swagger
+   * /new_products:
+   *   get:
+   *     summary: Récupérer les nouveaux produits
+   *     description: Récupère les produits créés au cours du dernier mois.
+   *     responses:
+   *       200:
+   *         description: Succès. Retourne la liste des nouveaux produits.
+   *       500:
+   *         description: Erreur serveur. Une erreur s'est produite lors de la récupération des nouveaux produits.
+   */
   app.get("/new_products", async (req, res) => {
     try {
-      const [rows] = await pool.execute("SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)");
+      const [rows] = await pool.execute(
+        "SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)",
+      );
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-
+  /**
+   * @swagger
+   * /liste_promo:
+   *   get:
+   *     summary: Récupérer la liste des produits en promotion
+   *     description: Récupère la liste des produits qui sont en promotion (avec un état de promotion supérieur à 0 et un prix promotionnel supérieur à 0).
+   *     responses:
+   *       200:
+   *         description: Succès. Retourne la liste des produits en promotion.
+   *       500:
+   *         description: Erreur serveur. Une erreur s'est produite lors de la récupération des produits en promotion.
+   */
   app.get("/liste_promo", async (req, res) => {
     try {
-      const [rows] = await pool.execute(" SELECT * FROM `produit` WHERE etatPromo >0 AND prixPromo > 0");
+      const [rows] = await pool.execute(
+        "SELECT * FROM `produit` WHERE etatPromo > 0 AND prixPromo > 0",
+      );
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
+  /**
+   * @swagger
+   * /addPanier:
+   *   post:
+   *     summary: Ajouter un produit au panier
+   *     description: Ajoute un produit au panier d'un utilisateur.
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               codec:
+   *                 type: string
+   *               total_prix:
+   *                 type: number
+   *               numero_ligne:
+   *                 type: string
+   *               reference:
+   *                 type: string
+   *               quantite:
+   *                 type: number
+   *     responses:
+   *       201:
+   *         description: Produit ajouté au panier avec succès.
+   *       500:
+   *         description: Erreur serveur. Une erreur s'est produite lors de l'enregistrement dans le panier.
+   */
+  app.post("/addPanier", async (req, res) => {
+    const { codec, total_prix, numero_ligne, reference, quantite } = req.body;
+    const values = [codec, total_prix, numero_ligne, reference, quantite];
+    try {
+      await pool.execute(
+        "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
+        values,
+      );
+      res.status(201).send();
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({
+        success: false,
+        message:
+          "Une erreur est survenue lors de l'enregistrement dans le panier",
+      });
+    }
+  });
+
+  // app.post("/addCommande", async (req, res) =>{
+  //   const {
+  //     codec,
+  //     total_prix,
+  //     reference,
+  //     quantite,
+  //   } = req.body;
+  //   const values = [
+  //     codec,
+  //     total_prix,
+  //     reference,
+  //     quantite,
+  //   ];
+  //   try {
+  //     await pool.execute(
+  //       "INSERT INTO commande (codev, codec, total_ht, numero_ligne, reference, quantite) VALUES (18,?,?,?,?,?)",
+  //       values
+  //     );
+  //     res.status(201).send();
+  //   } catch (err) {
+  //     console.log(err);
+  //     res.status(500).json({
+  //       success: false,
+  //       message: "Une erreur est survenue lors de l'enregistrement",
+  //     });
+  //   }
+  // });
+
+  /**
+   * @swagger
+   * /allorderClientEC:
+   *   get:
+   *     summary: Récupérer toutes les commandes en cours d'un client
+   *     description: Récupère toutes les commandes en cours d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/allorderClientEC", async (req, res) => {
+    const codec = req.query.codec;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE codec = ? and etat = 1",
+        [codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * @swagger
+   * /allorderClientCL:
+   *   get:
+   *     summary: Récupérer toutes les commandes clôturées d'un client
+   *     description: Récupère toutes les commandes clôturées d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/allorderClientCL", async (req, res) => {
+    const codec = req.query.codec;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE codec = ? and etat = 2",
+        [codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * @swagger
+   * /oneorderclient:
+   *   get:
+   *     summary: Récupérer une seule commande d'un client
+   *     description: Récupère une seule commande d'un client.
+   *     parameters:
+   *       - in: query
+   *         name: numero
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Numéro de commande
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/oneorderclient", async (req, res) => {
+    const { numero, codec } = req.query;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE numero = ? and codec = ?",
+        [numero, codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+  /**
+   * @swagger
+   * /order_ligne:
+   *   get:
+   *     summary: Récupérer la liste de toutes les lignes de commande
+   *     description: Récupère la liste de toutes les lignes de commande.
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/order_ligne", async (req, res) => {
+    const { numero } = req.query;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM ligne_commande where numero = ?",
+        [numero],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   /**
    * @swagger
    * /register:
@@ -111,7 +361,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       await pool.execute(
         "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail, adrLivraison) VALUES (?,?,?,?,?,?,?,?)",
-        values
+        values,
       );
       res.status(201).send();
     } catch (err) {
@@ -123,189 +373,6 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
-  app.post("/addPagnier", async (req, res) =>{
-    const {
-      codec,
-      total_prix,
-      numero_ligne,
-      reference,
-      quantite,
-    } = req.body;
-    const values = [
-      codec,
-      total_prix,
-      numero_ligne,
-      reference,
-      quantite,
-    ];
-    try {
-      await pool.execute(
-        "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
-        values
-      );
-      res.status(201).send();
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({
-        success: false,
-        message: "Une erreur est survenue lors de l'enregistrement",
-      });
-    }
-  });
-
-  // app.post("/addCommande", async (req, res) =>{
-  //   const {
-  //     codec,
-  //     total_prix,
-  //     reference,
-  //     quantite,
-  //   } = req.body;
-  //   const values = [
-  //     codec,
-  //     total_prix,
-  //     reference,
-  //     quantite,
-  //   ];
-  //   try {
-  //     await pool.execute(
-  //       "INSERT INTO commande (codev, codec, total_ht, numero_ligne, reference, quantite) VALUES (18,?,?,?,?,?)",
-  //       values
-  //     );
-  //     res.status(201).send();
-  //   } catch (err) {
-  //     console.log(err);
-  //     res.status(500).json({
-  //       success: false,
-  //       message: "Une erreur est survenue lors de l'enregistrement",
-  //     });
-  //   }
-  // });
-
-  /**
-   * @swagger
-   * /allorderClientEC:
-   *   get:
-   *     summary: Récupérer toutes les commandes en cours d'un client
-   *     description: Récupère toutes les commandes en cours d'un client.
-   *     parameters:
-   *       - in: query
-   *         name: codec
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Code client
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/allorderClientEC", async (req, res) => {
-    const codec = req.query.codec;
-    try {
-      const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE codec = ? and etat = 1",
-        [codec]
-      );
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * @swagger
-   * /allorderClientCL:
-   *   get:
-   *     summary: Récupérer toutes les commandes clôturées d'un client
-   *     description: Récupère toutes les commandes clôturées d'un client.
-   *     parameters:
-   *       - in: query
-   *         name: codec
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Code client
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/allorderClientCL", async (req, res) => {
-    const codec = req.query.codec;
-    try {
-      const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE codec = ? and etat = 2",
-        [codec]
-      );
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * @swagger
-   * /oneorderclient:
-   *   get:
-   *     summary: Récupérer une seule commande d'un client
-   *     description: Récupère une seule commande d'un client.
-   *     parameters:
-   *       - in: query
-   *         name: numero
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Numéro de commande
-   *       - in: query
-   *         name: codec
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Code client
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/oneorderclient", async (req, res) => {
-    const { numero, codec } = req.query;
-    try {
-      const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE numero = ? and codec = ?",
-        [numero, codec]
-      );
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-  /**
-   * @swagger
-   * /order_ligne:
-   *   get:
-   *     summary: Récupérer la liste de toutes les lignes de commande
-   *     description: Récupère la liste de toutes les lignes de commande.
-   *     responses:
-   *       200:
-   *         description: Succès
-   *       500:
-   *         description: Erreur serveur
-   */
-  app.get("/order_ligne", async (req, res) => {
-    const { numero } = req.query;
-    try {
-      const [rows] = await pool.execute(
-        "SELECT * FROM ligne_commande where numero = ?",
-        [numero]
-      );
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
   /**
    * @swagger
    * /login:
@@ -339,16 +406,21 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
       if (rows.length === 0) {
         return res
-            .status(401)
-            .json({ message: "L'adresse e-mail n'est pas enregistrée." });
+          .status(401)
+          .json({ message: "L'adresse e-mail n'est pas enregistrée." });
       }
 
       const user = rows[0];
       const passwordMatch = await bcrypt.compare(motdepasse, user.motdepasse);
 
       if (passwordMatch) {
-    const token = auth.generateToken(user);
-        res.status(200).json({ message: "Authentification réussie" , token});
+        const token = auth.generateToken(user);
+        // Mise à jour du client avec le token généré
+        const updateTokenQuery = "UPDATE client SET token = ? WHERE codec = ?";
+        const updateTokenValues = [token, user.codec];
+
+        await pool.execute(updateTokenQuery, updateTokenValues);
+        res.status(200).json({ message: "Authentification réussie", token });
       } else {
         res.status(401).json({ message: "Mot de passe incorrect." });
       }
@@ -359,20 +431,68 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
-   * /lookprofil:
+   * /verify-token:
    *   post:
-   *     summary: Recherche de profil client par code client
-   *     description: Recherche un profil client en utilisant le code client fourni.
+   *     summary: Vérification de la validité d'un token JWT
+   *     description: Vérifie si un token JWT n'est pas expiré.
    *     requestBody:
    *       content:
    *         application/json:
    *           schema:
    *             type: object
    *             properties:
-   *               codec:
+   *               token:
    *                 type: string
-   *           example:
-   *             codec: "123456"
+   *     responses:
+   *       200:
+   *         description: Token valide
+   *       401:
+   *         description: Token expiré ou invalide
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.post("/verify-token", async (req, res) => {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ message: "Token manquant." });
+    }
+
+    const user = auth.verifyToken(token);
+
+    if (user) {
+      // Le token est valide
+      res.status(200).json({ message: "Token valide" });
+    } else {
+      // Le token est expiré ou invalide
+      const updateTokenQuery = "UPDATE client SET token = '' WHERE token = ?";
+      const updateTokenValues = [token];
+
+      try {
+        await pool.execute(updateTokenQuery, updateTokenValues);
+        res.status(401).json({ message: "Token expiré ou invalide." });
+      } catch (error) {
+        res
+          .status(500)
+          .json({ message: "Erreur serveur lors de la mise à jour du token." });
+      }
+    }
+  });
+
+  /**
+   * @swagger
+   * /lookprofil:
+   *   get:
+   *     summary: Recherche de profil client par token
+   *     description: Recherche un profil client en utilisant le token JWT fourni en tant que paramètre de requête.
+   *     parameters:
+   *       - in: query
+   *         name: token
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Token JWT de l'utilisateur.
+   *         example: "votre_token_jwt"
    *     responses:
    *       200:
    *         description: Succès
@@ -401,14 +521,24 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *                     type: string
    *             example:
    *               - codec: 1
-   *                 nomprenom: Doe John
-   *                 adresse: 29ter route du mariland
+   *                 nom: Doe John
+   *                 adresse: 29ter route du Mariland
    *                 cp: "41575"
    *                 ville: Mariland
    *                 telephone: 0756487584
    *                 mail: thomas.campus.fr
-   *                 adrLivraison: 29ter route du mariland
-   *
+   *                 adrLivraison: 29ter route du Mariland
+   *       401:
+   *         description: Token manquant ou invalide
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *             example:
+   *               message: "Token manquant ou invalide."
    *       500:
    *         description: Erreur du serveur
    *         content:
@@ -421,13 +551,12 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *             example:
    *               message: "Une erreur s'est produite lors de la recherche du profil client."
    */
-
-  app.post("/lookprofil", async (req, res) => {
-    const { codec } = req.body;
+  app.get("/lookprofil", async (req, res) => {
+    const token = req.query.token;
     try {
       const [rows] = await pool.execute(
-        "SELECT * from client WHERE codec = ?",
-        [codec]
+        "SELECT * from client WHERE token = ?",
+        [token],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -472,7 +601,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ? WHERE mail = ?",
-        [nom, adresse, cp, ville, telephone, adrLivraison, mail]
+        [nom, adresse, cp, ville, telephone, adrLivraison, mail],
       );
       res.status(200).json(rows);
     } catch (err) {
