@@ -4,7 +4,7 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Votre API",
+      title: "GourmandiseAPI",
       version: "1.0.0",
       description: "Routes de l'api-Gourmandise",
     },

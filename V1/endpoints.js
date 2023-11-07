@@ -203,7 +203,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     const codec = req.query.codec;
     try {
       const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE codec = ? and etat = 1",
+        "SELECT * FROM commande WHERE codec = ? and etat IN (2, 3)",
         [codec],
       );
       res.status(200).json(rows);
@@ -212,6 +212,39 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
+  /**
+   * @swagger
+   * /VerifieOrderPaiement:
+   *   get:
+   *     summary: Vérifier l'état de paiement d'une commande
+   *     description: Vérifie l'état de paiement d'une commande pour un client.
+   *     tags:
+   *       - Commandes
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/VerifieOrderPaiement", async (req, res) => {
+    const codec = req.query.codec;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT paye FROM commande WHERE codec = ? ",
+        [codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   /**
    * @swagger
    * /allorderClientNP:
@@ -436,6 +469,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           type: string
    *         required: true
    *         description: Adresse de livraison de l'utilisateur
+   *     tags:
+   *       - Utilisateurs
    *     responses:
    *       201:
    *         description: Utilisateur enregistré avec succès
@@ -498,6 +533,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           type: string
    *         required: true
    *         description: Mot de passe de l'utilisateur
+   *     tags:
+   *       - Utilisateurs
    *     responses:
    *       200:
    *         description: Authentification réussie
@@ -551,6 +588,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           type: string
    *         required: true
    *         description: Token JWT de l'utilisateur
+   *     tags:
+   *       - Utilisateurs
    *     responses:
    *       200:
    *         description: Token valide
@@ -600,6 +639,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           type: string
    *         required: true
    *         description: Token JWT de l'utilisateur.
+   *     tags:
+   *       - Utilisateurs
    *     responses:
    *       200:
    *         description: Succès
@@ -659,6 +700,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   post:
    *     summary: Mettre à jour le profil d'un client
    *     description: Permet à un utilisateur de mettre à jour son profil.
+   *     tags:
+   *       - Utilisateurs
    *     parameters:
    *       - in: query
    *         name: nom
@@ -701,7 +744,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *         schema:
    *           type: string
    *         required: true
-   *         description
+   *         description: Adresse de livraison de l'utilisateur
    */
   app.post("/updateprofil", async (req, res) => {
     const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
