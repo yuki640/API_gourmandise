@@ -8,6 +8,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer la liste de tous les produits
    *     description: Récupère la liste de tous les produits.
+   *     tags:
+   *       - Produits
    *     responses:
    *       200:
    *         description: Succès
@@ -29,6 +31,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer la fiche d'un produit par référence
    *     description: Récupère la fiche d'un produit en utilisant sa référence.
+   *     tags:
+   *       - Produits
    *     parameters:
    *       - in: query
    *         name: reference
@@ -62,6 +66,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer les nouveaux produits
    *     description: Récupère les produits créés au cours du dernier mois.
+   *     tags:
+   *       - Produits
    *     responses:
    *       200:
    *         description: Succès. Retourne la liste des nouveaux produits.
@@ -85,6 +91,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer la liste des produits en promotion
    *     description: Récupère la liste des produits qui sont en promotion (avec un état de promotion supérieur à 0 et un prix promotionnel supérieur à 0).
+   *     tags:
+   *       - Produits
    *     responses:
    *       200:
    *         description: Succès. Retourne la liste des produits en promotion.
@@ -108,6 +116,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   post:
    *     summary: Ajouter un produit au panier
    *     description: Ajoute un produit au panier d'un utilisateur.
+   *     tags:
+   *       - Panier
    *     requestBody:
    *       content:
    *         application/json:
@@ -149,33 +159,24 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
-  // app.post("/addCommande", async (req, res) =>{
-  //   const {
-  //     codec,
-  //     total_prix,
-  //     reference,
-  //     quantite,
-  //   } = req.body;
-  //   const values = [
-  //     codec,
-  //     total_prix,
-  //     reference,
-  //     quantite,
-  //   ];
-  //   try {
-  //     await pool.execute(
-  //       "INSERT INTO commande (codev, codec, total_ht, numero_ligne, reference, quantite) VALUES (18,?,?,?,?,?)",
-  //       values
-  //     );
-  //     res.status(201).send();
-  //   } catch (err) {
-  //     console.log(err);
-  //     res.status(500).json({
-  //       success: false,
-  //       message: "Une erreur est survenue lors de l'enregistrement",
-  //     });
-  //   }
-  // });
+  app.post("/addCommande", async (req, res) => {
+    const { codec, total_prix, reference, quantite } = req.body;
+    const codev = 999;
+    const values = [codev, codec, total_prix, reference, quantite];
+    try {
+      await pool.execute(
+        "INSERT INTO commande (codev, codec, total_ht, numero_ligne, reference, quantite) VALUES (?,?,?,?,?,?)",
+        values,
+      );
+      res.status(201).send();
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({
+        success: false,
+        message: "Une erreur est survenue lors de l'enregistrement",
+      });
+    }
+  });
 
   /**
    * @swagger
@@ -183,6 +184,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer toutes les commandes en cours d'un client
    *     description: Récupère toutes les commandes en cours d'un client.
+   *     tags:
+   *       - Commandes
    *     parameters:
    *       - in: query
    *         name: codec
@@ -211,10 +214,80 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
+   * /allorderClientNP:
+   *   get:
+   *     summary: Récupérer toutes les commandes en cours non payé d'un client
+   *     description: Récupère toutes les commandes en cours non payé d'un client.
+   *     tags:
+   *       - Commandes
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/allorderClientNP", async (req, res) => {
+    const codec = req.query.codec;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE codec = ? and etat = 2",
+        [codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * @swagger
+   * /allorderClientP:
+   *   get:
+   *     summary: Récupérer toutes les commandes en cours payé d'un client
+   *     description: Récupère toutes les commandes en cours payé d'un client.
+   *     tags:
+   *       - Commandes
+   *     parameters:
+   *       - in: query
+   *         name: codec
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code client
+   *     responses:
+   *       200:
+   *         description: Succès
+   *       500:
+   *         description: Erreur serveur
+   */
+  app.get("/allorderClientP", async (req, res) => {
+    const codec = req.query.codec;
+    try {
+      const [rows] = await pool.execute(
+        "SELECT * FROM commande WHERE codec = ? and etat = 3",
+        [codec],
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * @swagger
    * /allorderClientCL:
    *   get:
    *     summary: Récupérer toutes les commandes clôturées d'un client
    *     description: Récupère toutes les commandes clôturées d'un client.
+   *     tags:
+   *       - Commandes
    *     parameters:
    *       - in: query
    *         name: codec
@@ -232,7 +305,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     const codec = req.query.codec;
     try {
       const [rows] = await pool.execute(
-        "SELECT * FROM commande WHERE codec = ? and etat = 2",
+        "SELECT * FROM commande WHERE codec = ? and etat = 4",
         [codec],
       );
       res.status(200).json(rows);
@@ -247,6 +320,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   get:
    *     summary: Récupérer une seule commande d'un client
    *     description: Récupère une seule commande d'un client.
+   *     tags:
+   *       - Commandes
    *     parameters:
    *       - in: query
    *         name: numero
@@ -278,12 +353,15 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
+
   /**
    * @swagger
    * /order_ligne:
    *   get:
    *     summary: Récupérer la liste de toutes les lignes de commande
    *     description: Récupère la liste de toutes les lignes de commande.
+   *     tags:
+   *       - Commandes
    *     responses:
    *       200:
    *         description: Succès
@@ -302,34 +380,62 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
+
   /**
    * @swagger
    * /register:
    *   post:
    *     summary: Inscription d'un utilisateur
    *     description: Permet à un utilisateur de s'inscrire.
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               nom:
-   *                 type: string
-   *               adresse:
-   *                 type: string
-   *               cp:
-   *                 type: string
-   *               ville:
-   *                 type: string
-   *               telephone:
-   *                 type: string
-   *               motdepasse:
-   *                 type: string
-   *               mail:
-   *                 type: string
-   *               adrLivraison:
-   *                 type: string
+   *     parameters:
+   *       - in: query
+   *         name: nom
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Nom de l'utilisateur
+   *       - in: query
+   *         name: adresse
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse de l'utilisateur
+   *       - in: query
+   *         name: cp
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code postal de l'utilisateur
+   *       - in: query
+   *         name: ville
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Ville de l'utilisateur
+   *       - in: query
+   *         name: telephone
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Numéro de téléphone de l'utilisateur
+   *       - in: query
+   *         name: motdepasse
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Mot de passe de l'utilisateur
+   *       - in: query
+   *         name: mail
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse e-mail de l'utilisateur
+   *       - in: query
+   *         name: adrLivraison
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse de livraison de l'utilisateur
    *     responses:
    *       201:
    *         description: Utilisateur enregistré avec succès
@@ -379,16 +485,19 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   post:
    *     summary: Authentification d'un utilisateur
    *     description: Permet à un utilisateur de se connecter.
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               email:
-   *                 type: string
-   *               motdepasse:
-   *                 type: string
+   *     parameters:
+   *       - in: query
+   *         name: email
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse e-mail de l'utilisateur
+   *       - in: query
+   *         name: motdepasse
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Mot de passe de l'utilisateur
    *     responses:
    *       200:
    *         description: Authentification réussie
@@ -435,14 +544,13 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   post:
    *     summary: Vérification de la validité d'un token JWT
    *     description: Vérifie si un token JWT n'est pas expiré.
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               token:
-   *                 type: string
+   *     parameters:
+   *       - in: query
+   *         name: token
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Token JWT de l'utilisateur
    *     responses:
    *       200:
    *         description: Token valide
@@ -492,7 +600,6 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           type: string
    *         required: true
    *         description: Token JWT de l'utilisateur.
-   *         example: "votre_token_jwt"
    *     responses:
    *       200:
    *         description: Succès
@@ -530,26 +637,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *                 adrLivraison: 29ter route du Mariland
    *       401:
    *         description: Token manquant ou invalide
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 message:
-   *                   type: string
-   *             example:
-   *               message: "Token manquant ou invalide."
    *       500:
    *         description: Erreur du serveur
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 message:
-   *                   type: string
-   *             example:
-   *               message: "Une erreur s'est produite lors de la recherche du profil client."
    */
   app.get("/lookprofil", async (req, res) => {
     const token = req.query.token;
@@ -570,31 +659,49 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *   post:
    *     summary: Mettre à jour le profil d'un client
    *     description: Permet à un utilisateur de mettre à jour son profil.
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               nom:
-   *                 type: string
-   *               adresse:
-   *                 type: string
-   *               cp:
-   *                 type: string
-   *               ville:
-   *                 type: string
-   *               telephone:
-   *                 type: string
-   *               mail:
-   *                 type: string
-   *               adrLivraison:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Profil mis à jour avec succès
-   *       500:
-   *         description: Erreur serveur
+   *     parameters:
+   *       - in: query
+   *         name: nom
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Nom de l'utilisateur
+   *       - in: query
+   *         name: adresse
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse de l'utilisateur
+   *       - in: query
+   *         name: cp
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Code postal de l'utilisateur
+   *       - in: query
+   *         name: ville
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Ville de l'utilisateur
+   *       - in: query
+   *         name: telephone
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Numéro de téléphone de l'utilisateur
+   *       - in: query
+   *         name: mail
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description: Adresse e-mail de l'utilisateur
+   *       - in: query
+   *         name: adrLivraison
+   *         schema:
+   *           type: string
+   *         required: true
+   *         description
    */
   app.post("/updateprofil", async (req, res) => {
     const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
