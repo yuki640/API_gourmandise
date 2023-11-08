@@ -157,7 +157,36 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       });
     }
   });
-
+  /**
+   * @swagger
+   * /addPanier:
+   *   post:
+   *     summary: Ajouter un produit au panier
+   *     description: Ajoute un produit au panier d'un utilisateur.
+   *     tags:
+   *       - Panier
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               codec:
+   *                 type: string
+   *               total_prix:
+   *                 type: number
+   *               numero_ligne:
+   *                 type: string
+   *               reference:
+   *                 type: string
+   *               quantite:
+   *                 type: number
+   *     responses:
+   *       201:
+   *         description: Produit ajouté au panier avec succès.
+   *       500:
+   *         description: Erreur serveur. Une erreur s'est produite lors de l'enregistrement dans le panier.
+   */
   app.post("/addCommande", async (req, res) => {
     const { token, paye } = req.body;
     const infoClient = await pool.execute(
@@ -169,34 +198,36 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       "SELECT sum(total_prix) from panier where codec = ?",
       infoClient.codec
     );
+    let etatcommande;
     if (!paye) {
-      const etatcommande = 2;
+      etatcommande = 2;
     } else {
-      const etatcommande = 3;
+      etatcommande = 3;
     }
-    const values = [codev, infoClient.codec, total_prix, etatcommande, paye];
+    let values = [codev, infoClient.codec, total_prix, etatcommande, paye];
     try {
       await pool.execute(
         "INSERT INTO commande (codev, codec, date_livraison, date_commande, total_prix, etat, paye) VALUES (?,?,?,?,?,?,?)",
         values
       );
 
-      const lastid = await pool.execute(
+      let lastid = await pool.execute(
         "select max(numero) as lastid from commande"
       );
+
       const [rows] = await pool.execute(
         "select * from panier where codec = ?",
         infoClient.codec
       );
       for (const row of rows) {
+        values = [lastid, row.numero_ligne, row.reference, row.quantite];
         await pool.execute(
-          "INSERT INTO ligne_commande (numero_ligne, reference, quantite_demandee) VALUES (?,?,?)",
+          "INSERT INTO ligne_commande (numero,numero_ligne, reference, quantite_demandee) VALUES (?,?,?,?)",
           values
         );
       }
-
       await pool.execute("DELETE FROM panier where codec= ?", codec);
-      res.status(201).send();
+      res.status(201).json({ message: "Voter commande a bien été effectué" });
     } catch (err) {
       console.log(err);
       res.status(500).json({
