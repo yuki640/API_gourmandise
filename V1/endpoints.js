@@ -26,7 +26,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
-   * /fiche_products:
+   * /ficheProducts:
    *   get:
    *     summary: Récupérer la fiche d'un produit par référence
    *     description: Récupère la fiche d'un produit en utilisant sa référence.
@@ -45,7 +45,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur
    */
-  app.get("/fiche_products", async (req, res) => {
+  app.get("/ficheProducts", async (req, res) => {
     const { reference } = req.body;
     const values = [reference];
     try {
@@ -61,7 +61,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
-   * /new_products:
+   * /newProducts:
    *   get:
    *     summary: Récupérer les nouveaux produits
    *     description: Récupère les produits créés au cours du dernier mois.
@@ -73,7 +73,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur. Une erreur s'est produite lors de la récupération des nouveaux produits.
    */
-  app.get("/new_products", async (req, res) => {
+  app.get("/newProducts", async (req, res) => {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)"
@@ -86,7 +86,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
-   * /liste_promo:
+   * /listePromo:
    *   get:
    *     summary: Récupérer la liste des produits en promotion
    *     description: Récupère la liste des produits qui sont en promotion (avec un état de promotion supérieur à 0 et un prix promotionnel supérieur à 0).
@@ -98,7 +98,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur. Une erreur s'est produite lors de la récupération des produits en promotion.
    */
-  app.get("/liste_promo", async (req, res) => {
+  app.get("/listePromo", async (req, res) => {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM `produit` WHERE etatPromo > 0 AND prixPromo > 0"
@@ -139,13 +139,28 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur. Une erreur s'est produite lors de l'enregistrement dans le panier.
    */
-  app.post("/addPanier", async (req, res) => {
+  app.post("/lookPanier", async (req, res) => {
     const { codec, total_prix, numero_ligne, reference, quantite } = req.body;
     const values = [codec, total_prix, numero_ligne, reference, quantite];
     try {
-      await pool.execute(
+      const rows = await pool.execute(
         "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
         values
+      );
+    res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+
+
+  app.get("/addPanier", async (req, res) => {
+    const {token} = req.body;
+    const codec = await pool.execute("select codec from client where token = ?", token)
+    try {
+      await pool.execute(
+        "select * from panier where codec = ?", codec
       );
       res.status(201).send();
     } catch (err) {
@@ -157,36 +172,6 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       });
     }
   });
-  /**
-   * @swagger
-   * /addPanier:
-   *   post:
-   *     summary: Ajouter un produit au panier
-   *     description: Ajoute un produit au panier d'un utilisateur.
-   *     tags:
-   *       - Panier
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               codec:
-   *                 type: string
-   *               total_prix:
-   *                 type: number
-   *               numero_ligne:
-   *                 type: string
-   *               reference:
-   *                 type: string
-   *               quantite:
-   *                 type: number
-   *     responses:
-   *       201:
-   *         description: Produit ajouté au panier avec succès.
-   *       500:
-   *         description: Erreur serveur. Une erreur s'est produite lors de l'enregistrement dans le panier.
-   */
   app.post("/addCommande", async (req, res) => {
     const { token, paye } = req.body;
     const infoClient = await pool.execute(
@@ -227,7 +212,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
         );
       }
       await pool.execute("DELETE FROM panier where codec= ?", codec);
-      res.status(201).json({ message: "Voter commande a bien été effectué" });
+      res.status(201).json({ message: "Votre commande a bien été effectué" });
     } catch (err) {
       console.log(err);
       res.status(500).json({
