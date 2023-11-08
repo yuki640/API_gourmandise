@@ -159,7 +159,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   });
 
   app.post("/addCommande", async (req, res) => {
-    const { token } = req.body;
+    const { token, paye } = req.body;
     const infoClient = await pool.execute(
       "SELECT codec from client where token= ?",
       token
@@ -169,18 +169,27 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       "SELECT sum(total_prix) from panier where codec = ?",
       infoClient.codec
     );
-    const values = [codev, infoClient.codec, total_prix, reference, quantite];
+    if(paye = 0){
+      const etatcommande = 2
+    }else{
+      const etatcommande = 3
+    } 
+    const values = [codev, infoClient.codec, total_prix, etatcommande, paye];
     try {
       await pool.execute(
-        "INSERT INTO commande (codev, codec,date_livraison,date_commande, total_prix,etat,paye) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO commande (codev, codec, date_livraison, date_commande, total_prix, etat, paye) VALUES (?,?,?,?,?,?,?)",
         values
       );
-      const numero = await pool.execute("SELECT last_insertID from commande");
 
-      // await pool.execute(
-      //   "INSERT INTO ligne_commande (??????) VALUES (?,?,?,?,?,?)",
-      //   values
-      // );
+      const lastid = await pool.execute("select max(numero) as lastid from commande");
+      const [rows] = await pool.execute("select * from panier where codec = ?", infoClient.codec);
+      array.forEach(rows => {
+        await pool.execute(
+          "INSERT INTO ligne_commande (numero_ligne, reference, quantite_demandee) VALUES (?,?,?)",
+          values
+        );
+      });
+     
       await pool.execute("DELETE FROM panier where codec= ?", codec);
       res.status(201).send();
     } catch (err) {
