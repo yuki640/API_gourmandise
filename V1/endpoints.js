@@ -51,7 +51,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM produit WHERE reference = ?",
-        values
+        values,
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -76,7 +76,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   app.get("/newProducts", async (req, res) => {
     try {
       const [rows] = await pool.execute(
-        "SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)"
+        "SELECT * FROM produit WHERE dateCreation >= date_sub(now(),INTERVAL 1 month)",
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -101,7 +101,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   app.get("/listePromo", async (req, res) => {
     try {
       const [rows] = await pool.execute(
-        "SELECT * FROM `produit` WHERE etatPromo > 0 AND prixPromo > 0"
+        "SELECT * FROM `produit` WHERE etatPromo > 0 AND prixPromo > 0",
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -170,31 +170,36 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   app.post("/addPanier", async (req, res) => {
     const { codec, total_prix, reference, quantite } = req.body;
     let numero_ligne;
-    const ReqNumLigne = await pool.execute(
-      "SELECT numero_ligne FROM panier where codec= ?",
-      codec
-    );
-    if (ReqNumLigne.length === 0) {
-      numero_ligne = 1;
-    } else {
-      numero_ligne = ReqNumLigne.numero_ligne + 1;
-    }
-    const ReqVerifieExiste = await pool.execute(
-      "SELECT reference FROM panier where codec= ?",
-      codec
-    );
-    const values = [codec, total_prix, numero_ligne, reference, quantite];
+
     try {
+      const [ReqNumLigne] = await pool.execute(
+        "SELECT numero_ligne FROM panier WHERE codec = ?",
+        [codec],
+      );
+
+      if (ReqNumLigne.length === 0) {
+        numero_ligne = 1;
+      } else {
+        numero_ligne = ReqNumLigne[0].numero_ligne + 1;
+      }
+
+      const [ReqVerifieExiste] = await pool.execute(
+        "SELECT reference FROM panier WHERE codec = ? and reference",
+        [codec, reference],
+      );
+
+      const values = [codec, total_prix, numero_ligne, reference, quantite];
+
       if (ReqVerifieExiste.length === 0) {
         const rows = await pool.execute(
           "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
-          values
+          values,
         );
         res.status(200).json(rows);
       } else {
         await pool.execute(
-          "UPDATE panier SET quantite = quantite+? WHERE reference = ?",
-          [quantite, reference]
+          "UPDATE panier SET quantite = quantite + ? WHERE reference = ?",
+          [quantite, reference],
         );
         res.status(200).json({
           message: "Le produit a été ajouté au panier",
@@ -204,51 +209,43 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
+
   /**
    * @swagger
    * /lookPanier:
-   *   post:
-   *     summary: Ajouter un produit au panier
-   *     description: Ajoute un produit au panier d'un utilisateur en fonction du token fourni.
+   *   get:
+   *     summary: Obtenir le panier de l'utilisateur
+   *     description: Obtient le panier d'un utilisateur en fonction du token fourni.
    *     tags:
    *       - Panier
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - token
-   *             properties:
-   *               token:
-   *                 type: string
-   *                 description: Token JWT pour authentifier l'utilisateur.
+   *     parameters:
+   *       - in: query
+   *         name: token
+   *         required: true
+   *         type: string
+   *         description: Token JWT pour authentifier l'utilisateur.
    *     responses:
-   *       201:
-   *         description: Produit ajouté au panier avec succès.
+   *       200:
+   *         description: Panier récupéré avec succès.
+   *       404:
+   *         description: Token introuvable.
    *       500:
-   *         description: Erreur serveur lors de l'ajout au panier.
+   *         description: Erreur serveur lors de la récupération du panier.
    */
 
   app.get("/lookPanier", async (req, res) => {
-    const { token } = req.body;
-    const codec = await pool.execute(
-      "select codec from client where token = ?",
-      token
-    );
+    const token = req.query.token;
     try {
-      await pool.execute("select * from panier where codec = ?", codec);
-      res.status(201).send();
+      const [rows] = await pool.execute(
+        "SELECT * from panier WHERE codec = (SELECT codec FROM client WHERE token = ?)",
+        [token],
+      );
+      res.status(200).json(rows);
     } catch (err) {
-      console.log(err);
-      res.status(500).json({
-        success: false,
-        message:
-          "Une erreur est survenue lors de l'enregistrement dans le panier",
-      });
+      res.status(500).json({ message: err.message });
     }
   });
+
   /**
    * @swagger
    * /addCommande:
@@ -291,12 +288,12 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     const { token, paye } = req.body;
     const infoClient = await pool.execute(
       "SELECT codec from client where token= ?",
-      token
+      token,
     );
     const codev = 999;
     const total_prix = await pool.execute(
       "SELECT sum(total_prix) from panier where codec = ?",
-      infoClient.codec
+      infoClient.codec,
     );
     let etatcommande;
     if (!paye) {
@@ -308,22 +305,22 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       await pool.execute(
         "INSERT INTO commande (codev, codec, date_livraison, date_commande, total_prix, etat, paye) VALUES (?,?,?,?,?,?,?)",
-        values
+        values,
       );
 
       let lastid = await pool.execute(
-        "select max(numero) as lastid from commande"
+        "select max(numero) as lastid from commande",
       );
 
       const [rows] = await pool.execute(
         "select * from panier where codec = ?",
-        infoClient.codec
+        infoClient.codec,
       );
       for (const row of rows) {
-        values = [lastid, row.numero_ligne, row.reference, row.quantite];
+        values = [lastid.lastid, row.numero_ligne, row.reference, row.quantite];
         await pool.execute(
           "INSERT INTO ligne_commande (numero,numero_ligne, reference, quantite_demandee) VALUES (?,?,?,?)",
-          values
+          values,
         );
       }
       await pool.execute("DELETE FROM panier where codec= ?", codec);
@@ -363,7 +360,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat IN (2, 3)",
-        [codec]
+        [codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -397,7 +394,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT paye FROM commande WHERE codec = ? ",
-        [codec]
+        [codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -430,7 +427,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat = 2",
-        [codec]
+        [codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -464,7 +461,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat = 3",
-        [codec]
+        [codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -498,7 +495,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE codec = ? and etat = 4",
-        [codec]
+        [codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -538,7 +535,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM commande WHERE numero = ? and codec = ?",
-        [numero, codec]
+        [numero, codec],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -565,7 +562,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * FROM ligne_commande where numero = ?",
-        [numero]
+        [numero],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -661,7 +658,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       await pool.execute(
         "INSERT INTO client (nom, adresse, cp, ville, telephone, motdepasse, mail, adrLivraison) VALUES (?,?,?,?,?,?,?,?)",
-        values
+        values,
       );
       res.status(201).send();
     } catch (err) {
@@ -845,7 +842,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "SELECT * from client WHERE token = ?",
-        [token]
+        [token],
       );
       res.status(200).json(rows);
     } catch (err) {
@@ -910,7 +907,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     try {
       const [rows] = await pool.execute(
         "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ? WHERE mail = ?",
-        [nom, adresse, cp, ville, telephone, adrLivraison, mail]
+        [nom, adresse, cp, ville, telephone, adrLivraison, mail],
       );
       res.status(200).json(rows);
     } catch (err) {
