@@ -183,7 +183,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
       const lastid = await pool.execute("select max(numero) as lastid from commande");
       const [rows] = await pool.execute("select * from panier where codec = ?", infoClient.codec);
-      array.forEach(rows => {
+      rows.forEach(row => {
         await pool.execute(
           "INSERT INTO ligne_commande (numero_ligne, reference, quantite_demandee) VALUES (?,?,?)",
           values
