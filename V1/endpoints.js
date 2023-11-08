@@ -113,11 +113,13 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    * @swagger
    * /addPanier:
    *   post:
-   *     summary: Ajouter un produit au panier
-   *     description: Ajoute un produit au panier d'un utilisateur.
+   *     summary: Ajouter un produit au panier ou mettre à jour la quantité
+   *     description: >
+   *       Ajoute un produit au panier d'un utilisateur si le produit n'est pas déjà présent. Si le produit est déjà présent, met à jour la quantité.
    *     tags:
    *       - Panier
    *     requestBody:
+   *       required: true
    *       content:
    *         application/json:
    *           schema:
@@ -125,43 +127,118 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *             properties:
    *               codec:
    *                 type: string
+   *                 description: Code du client.
    *               total_prix:
    *                 type: number
-   *               numero_ligne:
-   *                 type: string
+   *                 description: Prix total pour la quantité de produit ajoutée.
    *               reference:
    *                 type: string
+   *                 description: Référence du produit à ajouter ou mettre à jour dans le panier.
    *               quantite:
    *                 type: number
+   *                 description: Quantité du produit à ajouter ou la nouvelle quantité à mettre à jour.
    *     responses:
-   *       201:
-   *         description: Produit ajouté au panier avec succès.
+   *       200:
+   *         description: >
+   *           Si le produit est nouvellement ajouté ou la quantité est mise à jour avec succès, renvoie un succès.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               oneOf:
+   *                 - type: object
+   *                   properties:
+   *                     affectedRows:
+   *                       type: number
+   *                       description: Le nombre de lignes affectées par la requête SQL.
+   *                 - type: object
+   *                   properties:
+   *                     message:
+   *                       type: string
+   *                       example: Le produit a été ajouté au panier.
    *       500:
-   *         description: Erreur serveur. Une erreur s'est produite lors de l'enregistrement dans le panier.
+   *         description: >
+   *           Erreur serveur. Une erreur s'est produite lors de la tentative d'ajout d'un produit au panier ou de la mise à jour de sa quantité.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: Une erreur est survenue lors de l'enregistrement dans le panier.
    */
-  app.post("/lookPanier", async (req, res) => {
-    const { codec, total_prix, numero_ligne, reference, quantite } = req.body;
+  app.post("/addPanier", async (req, res) => {
+    const { codec, total_prix, reference, quantite } = req.body;
+    let numero_ligne;
+    const ReqNumLigne = await pool.execute(
+      "SELECT numero_ligne FROM panier where codec= ?",
+      codec
+    );
+    if (ReqNumLigne.length === 0) {
+      numero_ligne = 1;
+    } else {
+      numero_ligne = ReqNumLigne.numero_ligne + 1;
+    }
+    const ReqVerifieExiste = await pool.execute(
+      "SELECT reference FROM panier where codec= ?",
+      codec
+    );
     const values = [codec, total_prix, numero_ligne, reference, quantite];
     try {
-      const rows = await pool.execute(
-        "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
-        values
-      );
-    res.status(200).json(rows);
+      if (ReqVerifieExiste.length === 0) {
+        const rows = await pool.execute(
+          "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
+          values
+        );
+        res.status(200).json(rows);
+      } else {
+        await pool.execute(
+          "UPDATE panier SET quantite = quantite+? WHERE reference = ?",
+          [quantite, reference]
+        );
+        res.status(200).json({
+          message: "Le produit a été ajouté au panier",
+        });
+      }
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
+  /**
+   * @swagger
+   * /lookPanier:
+   *   post:
+   *     summary: Ajouter un produit au panier
+   *     description: Ajoute un produit au panier d'un utilisateur en fonction du token fourni.
+   *     tags:
+   *       - Panier
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Token JWT pour authentifier l'utilisateur.
+   *     responses:
+   *       201:
+   *         description: Produit ajouté au panier avec succès.
+   *       500:
+   *         description: Erreur serveur lors de l'ajout au panier.
+   */
 
-
-
-  app.get("/addPanier", async (req, res) => {
-    const {token} = req.body;
-    const codec = await pool.execute("select codec from client where token = ?", token)
+  app.get("/lookPanier", async (req, res) => {
+    const { token } = req.body;
+    const codec = await pool.execute(
+      "select codec from client where token = ?",
+      token
+    );
     try {
-      await pool.execute(
-        "select * from panier where codec = ?", codec
-      );
+      await pool.execute("select * from panier where codec = ?", codec);
       res.status(201).send();
     } catch (err) {
       console.log(err);
@@ -172,6 +249,44 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       });
     }
   });
+  /**
+   * @swagger
+   * /addCommande:
+   *   post:
+   *     summary: Ajouter une commande
+   *     description: Enregistre une nouvelle commande pour le client authentifié par le token fourni.
+   *     tags:
+   *       - Commandes
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *               - paye
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Token JWT pour authentifier l'utilisateur.
+   *               paye:
+   *                 type: boolean
+   *                 description: Indique si la commande a été payée.
+   *     responses:
+   *       201:
+   *         description: Commande ajoutée avec succès.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Votre commande a bien été effectuée."
+   *       500:
+   *         description: Erreur serveur lors de l'ajout de la commande.
+   */
   app.post("/addCommande", async (req, res) => {
     const { token, paye } = req.body;
     const infoClient = await pool.execute(
