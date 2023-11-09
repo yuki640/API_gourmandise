@@ -12,7 +12,7 @@ require("dotenv").config();
 const PORT = process.env.PORT;
 
 // Nous définissons les paramètres du serveur
-const hostname = "localhost";
+const hostname = process.env.DB_HOST;
 const monRouteur = express.Router();
 
 // Pour utiliser bodyparser
