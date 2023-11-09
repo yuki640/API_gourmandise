@@ -245,7 +245,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
-  
+
 /**
  * @swagger
  * /deletePanier:
@@ -391,6 +391,23 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     }
   });
 
+  app.post("/deleteCommande", async (req, res) => {
+    const {numero} = req.body;
+    let rows;
+    try {
+      [rows] = await pool.execute(
+        "Delete FROM ligne_commande WHERE numero = ?",
+        [numero]
+      );
+      [rows] = await pool.execute(
+        "Delete FROM commande WHERE numero = ?",
+        [numero]
+      );
+      res.status(200).json(rows);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   /**
    * @swagger
    * /allorderClientEC:
