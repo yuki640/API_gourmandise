@@ -112,7 +112,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   /**
    * @swagger
    * /addPanier:
-   *   post:
+   *   put:
    *     summary: Ajouter un produit au panier ou mettre à jour la quantité
    *     description: >
    *       Ajoute un produit au panier d'un utilisateur si le produit n'est pas déjà présent. Si le produit est déjà présent, met à jour la quantité.
@@ -125,9 +125,9 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           schema:
    *             type: object
    *             properties:
-   *               codec:
+   *               token:
    *                 type: string
-   *                 description: Code du client.
+   *                 description: Token du client.
    *               total_prix:
    *                 type: number
    *                 description: Prix total pour la quantité de produit ajoutée.
@@ -144,17 +144,25 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *         content:
    *           application/json:
    *             schema:
-   *               oneOf:
-   *                 - type: object
-   *                   properties:
-   *                     affectedRows:
-   *                       type: number
-   *                       description: Le nombre de lignes affectées par la requête SQL.
-   *                 - type: object
-   *                   properties:
-   *                     message:
-   *                       type: string
-   *                       example: Le produit a été ajouté au panier.
+   *               type: object
+   *               properties:
+   *                 affectedRows:
+   *                   type: number
+   *                   description: Le nombre de lignes affectées par la requête SQL.
+   *                 message:
+   *                   type: string
+   *                   example: Le produit a été ajouté au panier.
+   *       404:
+   *         description: >
+   *           Client non trouvé. Indique que le client avec le token spécifié n'a pas été trouvé.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: Client non trouvé.
    *       500:
    *         description: >
    *           Erreur serveur. Une erreur s'est produite lors de la tentative d'ajout d'un produit au panier ou de la mise à jour de sa quantité.
@@ -167,11 +175,26 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *                   type: string
    *                   example: Une erreur est survenue lors de l'enregistrement dans le panier.
    */
-  app.post("/addPanier", async (req, res) => {
-    const { codec, total_prix, reference, quantite } = req.body;
-    let numero_ligne;
+  app.put("/addPanier", async (req, res) => {
+    console.log("req_body : " + req.body);
+    const { token, total_prix, reference, quantite } = req.body;
+    let codec;
+
+    const [infoClient] = await pool.execute(
+      "SELECT codec from client where token= ?",
+      [token]
+    );
+    if (infoClient && infoClient.length > 0 && infoClient[0].codec) {
+      codec = infoClient[0].codec;
+      console.log("codec : " + codec);
+    } else {
+      // Gérer le cas où infoClient est indéfini ou vide
+      console.log(codec);
+      return res.status(404).json({ message: "Client non trouvé" });
+    }
 
     try {
+      let numero_ligne;
       const [ReqNumLigne] = await pool.execute(
         "SELECT numero_ligne FROM panier WHERE codec = ?",
         [codec]
@@ -184,10 +207,10 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       }
 
       const [ReqVerifieExiste] = await pool.execute(
-        "SELECT reference FROM panier WHERE codec = ? and reference",
+        "SELECT reference FROM panier WHERE codec = ? and reference = ?",
         [codec, reference]
       );
-
+      console.log(ReqVerifieExiste);
       const values = [codec, total_prix, numero_ligne, reference, quantite];
 
       if (ReqVerifieExiste.length === 0) {
@@ -195,6 +218,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
           "INSERT INTO panier (codec, total_prix, numero_ligne, reference, quantite) VALUES (?,?,?,?,?)",
           values
         );
+        console.log(rows, values);
         res.status(200).json(rows);
       } else {
         await pool.execute(
@@ -237,66 +261,9 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     const token = req.query.token;
     try {
       const [rows] = await pool.execute(
-        "SELECT * from panier WHERE codec = (SELECT codec FROM client WHERE token = ?)",
+        "SELECT panier.total_prix,panier.reference,panier.quantite,produit.designation,produit.image from panier,produit WHERE codec = (SELECT codec FROM client WHERE token = ?) AND panier.reference = produit.reference ",
         [token]
       );
-      res.status(200).json(rows);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-  
-/**
- * @swagger
- * /deletePanier:
- *   post:
- *     summary: Supprimer un élément du panier
- *     description: Supprime un élément du panier en fonction du code client et éventuellement du code produit.
- *     tags:
- *       - Panier
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - codec
- *             properties:
- *               codec:
- *                 type: string
- *                 description: Code client.
- *               codepa:
- *                 type: string
- *                 description: Code produit (facultatif).
- *     responses:
- *       200:
- *         description: Élément du panier supprimé avec succès.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Élément du panier supprimé avec succès."
- *       500:
- *         description: Erreur serveur lors de la suppression de l'élément du panier.
- */
-  app.post("/deletePanier", async (req, res) => {
-    const { codec, codepa } = req.body;
-    let rows;
-    try {
-      if (codepa === "") {
-        [rows] = await pool.execute("Delete FROM panier WHERE codec = ?", [
-          codec,
-        ]);
-      } else {
-        [rows] = await pool.execute(
-          "Delete FROM panier WHERE codec = ? AND codepa = ?",
-          [codec, codepa]
-        );
-      }
       res.status(200).json(rows);
     } catch (err) {
       res.status(500).json({ message: err.message });
@@ -305,8 +272,76 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
 
   /**
    * @swagger
+   * /deletePanier:
+   *   delete:
+   *     summary: Supprimer un élément du panier
+   *     description: Supprime un élément du panier en fonction du code client et éventuellement du code produit.
+   *     tags:
+   *       - Panier
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - codec
+   *             properties:
+   *               codec:
+   *                 type: string
+   *                 description: Code client.
+   *               codepa:
+   *                 type: string
+   *                 description: Code produit (facultatif).
+   *     responses:
+   *       200:
+   *         description: Élément du panier supprimé avec succès.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Élément du panier supprimé avec succès."
+   *       500:
+   *         description: Erreur serveur lors de la suppression de l'élément du panier.
+   */
+  app.delete("/deletePanier", async (req, res) => {
+    const { codec, codepa } = req.body;
+    try {
+      let rows;
+
+      if (codepa === "") {
+        [rows] = await pool.execute("DELETE FROM panier WHERE codec = ?", [
+          codec,
+        ]);
+      } else {
+        [rows] = await pool.execute(
+          "DELETE FROM panier WHERE codec = ? AND codepa = ?",
+          [codec, codepa]
+        );
+      }
+
+      if (rows.affectedRows > 0) {
+        res
+          .status(200)
+          .json({ message: "Élément du panier supprimé avec succès." });
+      } else {
+        res.status(404).json({ message: "Élément du panier introuvable." });
+      }
+    } catch (err) {
+      res.status(500).json({
+        message:
+          "Erreur serveur lors de la suppression de l'élément du panier.",
+      });
+    }
+  });
+
+  /**
+   * @swagger
    * /addCommande:
-   *   post:
+   *   put:
    *     summary: Ajouter une commande
    *     description: Enregistre une nouvelle commande pour le client authentifié par le token fourni.
    *     tags:
@@ -341,7 +376,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur lors de l'ajout de la commande.
    */
-  app.post("/addCommande", async (req, res) => {
+  app.put("/addCommande", async (req, res) => {
     const { token, paye } = req.body;
     const infoClient = await pool.execute(
       "SELECT codec from client where token= ?",
@@ -381,12 +416,13 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
         );
       }
       await pool.execute("DELETE FROM panier where codec= ?", codec);
-      res.status(201).json({ message: "Votre commande a bien été effectué" });
+      res.status(201).json({ message: "Votre commande a bien été effectuée." });
     } catch (err) {
       console.log(err);
       res.status(500).json({
         success: false,
-        message: "Une erreur est survenue lors de l'enregistrement",
+        message:
+          "Une erreur est survenue lors de l'enregistrement de la commande.",
       });
     }
   });
@@ -630,7 +666,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   /**
    * @swagger
    * /register:
-   *   post:
+   *   put:
    *     summary: Inscription d'un utilisateur
    *     description: Permet à un utilisateur de s'inscrire.
    *     parameters:
@@ -690,7 +726,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *       500:
    *         description: Erreur serveur
    */
-  app.post("/register", async (req, res) => {
+  app.put("/register", async (req, res) => {
     const {
       nom,
       adresse,
