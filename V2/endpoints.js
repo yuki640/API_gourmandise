@@ -186,10 +186,8 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     );
     if (infoClient && infoClient.length > 0 && infoClient[0].codec) {
       codec = infoClient[0].codec;
-      console.log("codec : " + codec);
     } else {
       // Gérer le cas où infoClient est indéfini ou vide
-      console.log(codec);
       return res.status(404).json({ message: "Client non trouvé" });
     }
 
@@ -261,7 +259,7 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
     const token = req.query.token;
     try {
       const [rows] = await pool.execute(
-        "SELECT panier.total_prix,panier.reference,panier.quantite,produit.designation,produit.image from panier,produit WHERE codec = (SELECT codec FROM client WHERE token = ?) AND panier.reference = produit.reference ",
+        "SELECT panier.total_prix,panier.reference,panier.quantite,produit.designation,produit.image,panier.codepa from panier,produit WHERE codec = (SELECT codec FROM client WHERE token = ?) AND panier.reference = produit.reference ",
         [token],
       );
       res.status(200).json(rows);
@@ -269,13 +267,13 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
       res.status(500).json({ message: err.message });
     }
   });
-
   /**
    * @swagger
-   * /deletePanier:
-   *   delete:
-   *     summary: Supprimer un élément du panier
-   *     description: Supprime un élément du panier en fonction du code client et éventuellement du code produit.
+   * /updatePanier:
+   *   put:
+   *     summary: Modifier la quantité d'un produit dans le panier
+   *     description: >
+   *       Modifie la quantité d'un produit dans le panier en fonction du code produit et de la nouvelle quantité.
    *     tags:
    *       - Panier
    *     requestBody:
@@ -285,17 +283,18 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *           schema:
    *             type: object
    *             required:
-   *               - codec
+   *               - codepa
+   *               - nouvelleQuantite
    *             properties:
-   *               codec:
-   *                 type: string
-   *                 description: Code client.
    *               codepa:
    *                 type: string
-   *                 description: Code produit (facultatif).
+   *                 description: Code produit dont la quantité doit être modifiée.
+   *               nouvelleQuantite:
+   *                 type: integer
+   *                 description: Nouvelle quantité du produit dans le panier.
    *     responses:
    *       200:
-   *         description: Élément du panier supprimé avec succès.
+   *         description: Quantité du produit mise à jour avec succès.
    *         content:
    *           application/json:
    *             schema:
@@ -303,32 +302,156 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
    *               properties:
    *                 message:
    *                   type: string
-   *                   example: "Élément du panier supprimé avec succès."
+   *                   example: "Quantité du produit mise à jour avec succès."
+   *       404:
+   *         description: >
+   *           L'élément du panier spécifié n'existe pas ou la nouvelle quantité est invalide.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Élément du panier introuvable ou nouvelle quantité invalide."
+   *       500:
+   *         description: Erreur serveur lors de la mise à jour de la quantité du produit dans le panier.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Erreur serveur lors de la mise à jour de la quantité du produit dans le panier."
+   */
+  app.put("/updatePanier", async (req, res) => {
+    const { codepa, nouvelleQuantite } = req.body;
+
+    try {
+      if (!codepa || codepa.length === 0 || nouvelleQuantite < 0) {
+        return res.status(404).json({ message: "Paramètres invalides." });
+      }
+
+      // Mettre à jour la quantité du produit dans le panier
+      const [rows] = await pool.execute(
+        "UPDATE panier SET quantite = ? WHERE codepa = ?",
+        [nouvelleQuantite, codepa],
+      );
+
+      if (rows && rows.affectedRows > 0) {
+        res
+          .status(200)
+          .json({ message: "Quantité du produit mise à jour avec succès." });
+      } else {
+        // L'élément du panier spécifié n'existe pas
+        res.status(404).json({ message: "Élément du panier introuvable." });
+      }
+    } catch (err) {
+      res.status(500).json({
+        message:
+          "Erreur serveur lors de la mise à jour de la quantité du produit dans le panier.",
+      });
+    }
+  });
+
+  /**
+   * @swagger
+   * /deletePanier:
+   *   delete:
+   *     summary: Supprimer un élément du panier
+   *     description: >
+   *       Supprime un élément du panier en fonction du code client et éventuellement du code produit.
+   *       Si le code produit (codepa) est fourni, il supprime uniquement cet article.
+   *       Si le code produit est vide et le jeton d'authentification (token) est fourni, il supprime tous les articles du panier pour le client spécifié.
+   *     tags:
+   *       - Panier
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Jeton d'authentification du client.
+   *               codepa:
+   *                 type: string
+   *                 description: Code produit à supprimer du panier (facultatif).
+   *     responses:
+   *       200:
+   *         description: Élément(s) du panier supprimé(s) avec succès.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Élément(s) du panier supprimé(s) avec succès."
+   *       404:
+   *         description: >
+   *           Le client n'a pas été trouvé ou l'élément du panier spécifié n'existe pas.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Élément(s) du panier introuvable(s) ou client non trouvé."
    *       500:
    *         description: Erreur serveur lors de la suppression de l'élément du panier.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                   example: "Erreur serveur lors de la suppression de l'élément du panier."
    */
   app.delete("/deletePanier", async (req, res) => {
-    const { codec, codepa } = req.body;
+    const { token, codepa } = req.body;
+    let codec;
     try {
       let rows;
 
       if (codepa === "") {
-        [rows] = await pool.execute("DELETE FROM panier WHERE codec = ?", [
-          codec,
-        ]);
-      } else {
-        [rows] = await pool.execute(
-          "DELETE FROM panier WHERE codec = ? AND codepa = ?",
-          [codec, codepa],
-        );
-      }
+        // Supprimer tous les éléments du panier pour le client spécifié par 'codec' (si 'token' est renseigné)
+        // Ne rien faire si 'token' n'est pas renseigné
+        if (token && token.length !== 0) {
+          const [infoClient] = await pool.execute(
+            "SELECT codec from client where token= ?",
+            [token],
+          );
 
-      if (rows.affectedRows > 0) {
+          if (infoClient && infoClient.length > 0 && infoClient[0].codec) {
+            codec = infoClient[0].codec;
+            [rows] = await pool.execute("DELETE FROM panier WHERE codec = ?", [
+              codec,
+            ]);
+          } else {
+            // Gérer le cas où infoClient est indéfini ou vide
+            return res.status(404).json({ message: "Client non trouvé" });
+          }
+        }
+      } else {
+        // Supprimer uniquement le produit spécifié par 'codepa', indépendamment du client
+        [rows] = await pool.execute("DELETE FROM panier WHERE codepa = ?", [
+          codepa,
+        ]);
+      }
+      console.log("ici,", codepa, " rows :", rows);
+      if (rows && rows.affectedRows > 0) {
         res
           .status(200)
-          .json({ message: "Élément du panier supprimé avec succès." });
+          .json({ message: "Élément(s) du panier supprimé(s) avec succès." });
       } else {
-        res.status(404).json({ message: "Élément du panier introuvable." });
+        res
+          .status(404)
+          .json({ message: "Élément(s) du panier introuvable(s)." });
       }
     } catch (err) {
       res.status(500).json({
