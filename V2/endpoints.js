@@ -1043,65 +1043,105 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
   /**
    * @swagger
    * /updateprofil:
-   *   post:
+   *   put:
    *     summary: Mettre à jour le profil d'un client
    *     description: Permet à un utilisateur de mettre à jour son profil.
    *     tags:
    *       - Utilisateurs
-   *     parameters:
-   *       - in: query
-   *         name: nom
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Nom de l'utilisateur
-   *       - in: query
-   *         name: adresse
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Adresse de l'utilisateur
-   *       - in: query
-   *         name: cp
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Code postal de l'utilisateur
-   *       - in: query
-   *         name: ville
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Ville de l'utilisateur
-   *       - in: query
-   *         name: telephone
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Numéro de téléphone de l'utilisateur
-   *       - in: query
-   *         name: mail
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Adresse e-mail de l'utilisateur
-   *       - in: query
-   *         name: adrLivraison
-   *         schema:
-   *           type: string
-   *         required: true
-   *         description: Adresse de livraison de l'utilisateur
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               nom:
+   *                 type: string
+   *                 description: Nom de l'utilisateur
+   *               adresse:
+   *                 type: string
+   *                 description: Adresse de l'utilisateur
+   *               cp:
+   *                 type: string
+   *                 description: Code postal de l'utilisateur
+   *               ville:
+   *                 type: string
+   *                 description: Ville de l'utilisateur
+   *               telephone:
+   *                 type: string
+   *                 description: Numéro de téléphone de l'utilisateur
+   *               mailactuel:
+   *                 type: string
+   *                 description: Adresse e-mail actuelle de l'utilisateur
+   *               mail:
+   *                 type: string
+   *                 description: Nouvelle adresse e-mail de l'utilisateur
+   *               adrLivraison:
+   *                 type: string
+   *                 description: Adresse de livraison de l'utilisateur
+   *               codec:
+   *                 type: string
+   *                 description: Codec de l'utilisateur (identifiant unique)
+   *     responses:
+   *       200:
+   *         description: Profil mis à jour avec succès
+   *         content:
+   *           application/json:
+   *             example: {"message": "Profil mis à jour avec succès"}
+   *       400:
+   *         description: Mauvaise requête, vérifiez les paramètres fournis
+   *         content:
+   *           application/json:
+   *             example: {"error": "Mauvaise requête, vérifiez les paramètres fournis"}
+   *       404:
+   *         description: Utilisateur non trouvé
+   *         content:
+   *           application/json:
+   *             example: {"error": "Utilisateur non trouvé"}
+   *       500:
+   *         description: Erreur interne du serveur
+   *         content:
+   *           application/json:
+   *             example: {"error": "Erreur interne du serveur"}
    */
-  app.post("/updateprofil", async (req, res) => {
-    const { nom, adresse, cp, ville, telephone, mail, adrLivraison } = req.body;
+
+  app.put("/updateprofil", async (req, res) => {
+    const {
+      nom,
+      adresse,
+      cp,
+      ville,
+      telephone,
+      mailactuel, // Assurez-vous de normaliser la casse
+      mail,
+      adrLivraison,
+      codec,
+    } = req.body;
+
     try {
-      const [rows] = await pool.execute(
-        "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ? WHERE mail = ?",
-        [nom, adresse, cp, ville, telephone, adrLivraison, mail],
-      );
-      res.status(200).json(rows);
+      const sqlQuery =
+        "UPDATE client SET nom = ?, adresse = ?, cp = ?, ville = ?, telephone = ?, adrLivraison = ?, mail = ? WHERE codec = ?";
+
+      const [rows] = await pool.execute(sqlQuery, [
+        nom,
+        adresse,
+        cp,
+        ville,
+        telephone,
+        adrLivraison,
+        mail,
+        codec,
+      ]);
+
+      console.log("Après l'exécution de la requête SQL");
+
+      if (rows.affectedRows > 0) {
+        res.status(200).json({ message: "Profil mis à jour avec succès" });
+      } else {
+        res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ error: "Erreur interne du serveur" });
     }
   });
 };
