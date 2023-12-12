@@ -1133,10 +1133,113 @@ module.exports = function (app, monRouteur, pool, bcrypt) {
         codec,
       ]);
 
-      console.log("Après l'exécution de la requête SQL");
-
       if (rows.affectedRows > 0) {
         res.status(200).json({ message: "Profil mis à jour avec succès" });
+      } else {
+        res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Erreur interne du serveur" });
+    }
+  });
+
+  /**
+   * @swagger
+   * /updatemotdepasse:
+   *   put:
+   *     summary: Mettre à jour le mot de passe d'un client
+   *     description: Permet à un utilisateur de mettre à jour son mot de passe.
+   *     tags:
+   *       - Utilisateurs
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               codec:
+   *                 type: string
+   *                 description: Codec de l'utilisateur (identifiant unique)
+   *               oldMotDePasse:
+   *                 type: string
+   *                 description: Mot de passe actuel de l'utilisateur
+   *               newMotDePasse:
+   *                 type: string
+   *                 description: Nouveau mot de passe de l'utilisateur
+   *     responses:
+   *       200:
+   *         description: Mot de passe mis à jour avec succès
+   *         content:
+   *           application/json:
+   *             example: {"message": "Mot de passe mis à jour avec succès"}
+   *       400:
+   *         description: Mauvaise requête, vérifiez les paramètres fournis
+   *         content:
+   *           application/json:
+   *             example: {"error": "Le nouveau mot de passe est identique à l'ancien"}
+   *       401:
+   *         description: Mot de passe actuel incorrect
+   *         content:
+   *           application/json:
+   *             example: {"error": "Mot de passe actuel incorrect"}
+   *       404:
+   *         description: Utilisateur non trouvé
+   *         content:
+   *           application/json:
+   *             example: {"error": "Utilisateur non trouvé"}
+   *       500:
+   *         description: Erreur interne du serveur
+   *         content:
+   *           application/json:
+   *             example: {"error": "Erreur interne du serveur"}
+   */
+
+  app.put("/updatemotdepasse", async (req, res) => {
+    const { codec, oldMotDePasse, newMotDePasse } = req.body;
+
+    try {
+      // Récupérer le mot de passe actuel de l'utilisateur depuis la base de données
+      const [user] = await pool.execute(
+        "SELECT motdepasse FROM client WHERE codec = ?",
+        [codec],
+      );
+
+      if (user.length === 0) {
+        // L'utilisateur n'a pas été trouvé
+        res.status(404).json({ error: "Utilisateur non trouvé" });
+        return;
+      }
+
+      // Vérifier si le mot de passe actuel est correct
+      const isPasswordCorrect = await bcrypt.compare(
+        oldMotDePasse,
+        user[0].motdepasse,
+      );
+
+      if (!isPasswordCorrect) {
+        // Retourner une réponse 401 si le mot de passe actuel est incorrect
+        res.status(401).json({ error: "Mot de passe actuel incorrect" });
+        return;
+      }
+
+      // Vérifier si le nouveau mot de passe est différent de l'ancien
+      if (oldMotDePasse === newMotDePasse) {
+        res
+          .status(400)
+          .json({ error: "Le nouveau mot de passe est identique à l'ancien" });
+        return;
+      }
+
+      // Le mot de passe actuel est correct et le nouveau mot de passe est différent, mettre à jour le mot de passe dans la base de données
+      const hashedNewPassword = await bcrypt.hash(newMotDePasse, 10);
+      const sqlQuery = "UPDATE client SET motdepasse = ? WHERE codec = ?";
+      const [rows] = await pool.execute(sqlQuery, [hashedNewPassword, codec]);
+
+      if (rows.affectedRows > 0) {
+        res
+          .status(200)
+          .json({ message: "Mot de passe mis à jour avec succès" });
       } else {
         res.status(404).json({ error: "Utilisateur non trouvé" });
       }
